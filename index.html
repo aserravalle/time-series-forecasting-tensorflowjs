@@ -71,7 +71,7 @@
                In production, we would train using as much data as possible from all clients, then use the weights derived here in a process called <i>Transfer Learning</i> to train a new model and make predictions.
             </p>
             <p>
-               Client training is most useful when refining the model for edge cases, often combined with transfer learning. Thus, this application is the perfect use case before you consider that it will reduce the load on Wisecloud servers.
+               Client training is most useful when refining the model for edge cases, often combined with transfer learning. This is why the SPRs are so perfect for it, even before you consider the reduced load on Wisecloud servers.
             </p>
          </div>
       </div> <!-- intro -->
@@ -84,7 +84,7 @@
                There are 4 parts to this app:
                <li>Client uploads their Shipment Profile Report</li>
                <li>We group <i>Sum of Revenue</i> by <i>Departure Date</i></li>
-               <li>Use this grouped dataset to train a neural network in <i>model.js</i></li>
+               <li>Use this grouped dataset to train a neural network in <i>index.js</i></li>
                <li>Graph the previous results and predictions</li>
             </ol>
             <ul>
@@ -99,9 +99,11 @@
 
             <!-- [Data Upload] -->
             <div class="file-upload-wrapper">
-               <input type="file" id="prediction-data-upload" class="file-upload" on accept=".csv" onchange="onClickLoadData()" />
+               <input type="file" id="prediction_data_upload" class="file-upload" on accept=".csv" onchange="onClickLoadData()" />
+               <div><p id="error_message"></p></div>
             </div>
             <br />
+
             <div>
                <div class="preloader-wrapper small active" id="btn_train_loading" style="display:none">
                   <div class="spinner-layer spinner-green-only">
@@ -151,17 +153,14 @@
             <span class="card-title">Train Neural Network</span>
             <p>
                <!-- [TrainDescription] -->
-               Above you have uploaded <i>Training Data</i> and visualised it. Next we will train the model again on an unseen <i>Test Dataset</i>.
-            </p>
-            <p>
-               Remember that the purpose here is not to create an extremely accurate model, but to demonstrate that the training can be accomplished on the client side.
+               Above you have uploaded <i>Training Data</i> and visualised it. Now we will train a model on that data.
             </p>
 
             <span class="card-title">Try It</span>
             <!-- [NeedsData] -->
             <div class="row" id="div_container_trainfirst">
                <div class="col s12">
-                  <p>Need training data? Explore the previous section to <a href="#div_sma">prepare training data</a>.</p>
+                  <p>Need to upload training data.</p>
                </div>
             </div>
 
@@ -201,12 +200,12 @@
             <span class="card-title">Validation</span>
             <p>
                <!-- [Validation] -->
-               Now we have trained our model, you can use it to predict the orange line. The sign of a successful model is that the red line looks like what you'd expect the orange line to look like if it continued.
+               Now we have trained our model, you can use it to predict the shipment revenue. The sign of a successful model is that the green line closely follows the blue.
             </p>
             <span class="card-title">Try It</span>
             <div class="row" id="div_container_validatefirst">
                <div class="col s12">
-                  <p>Don’t have a model to perform prediction? <a href="#div_train">Train your model</a>.</p>
+                  <p>Need to train a model.</p>
                </div>
             </div>
 
@@ -214,7 +213,7 @@
                <div class="col s12">
                   <p>
                      <!-- [how to use, what you want your reader to do after you end, as simple and obvious] -->
-                     Hit the <i>Validate Model</i> button to see how this model performs. Whohoo!
+                     Hit the <i>Validate Model</i> button to see how this model performs.
                   </p>
                </div>
                <div class="col s6">
@@ -236,66 +235,34 @@
          </div>
       </div> <!-- div_validate -->
 
-      <div class="card" id="div_predict">
+      <div class="card" id="div_next_steps">
          <div class="card-content">
-            <span class="card-title">Make Prediction</span>
+            <span class="card-title">Next Steps</span>
+            <div class="card-image">
+               <img src="./architecture.png" alt="Time Series Forecasting with TensorFlow.js">
+            </div>
             <p>
-               <!-- [Prediction] -->
-               Finally, the model has been validated and the predicted values map closely to its true values, we shall use it to predict the future.
+               I'd propose that...?
             </p>
-
-            <!-- [NeedsValidation] -->
-            <span class="card-title">Try It</span>
-            <div class="row" id="div_container_predictfirst">
-               <div class="col s12">
-                  <p>Don’t have a model to perform prediction? <a href="#div_train">Train your model</a>.</p>
-               </div>
-            </div>
-            <div class="row" id="div_container_predict" style="display:none">
-               <div class="col s12">
-                  <p>
-                     <!-- [how to use, what you want your reader to do after you end, as simple and obvious] -->
-                     Hit the <i>Validate Model</i> button to see how this model performs. Whohoo!
-                  </p>
-               </div>
-
-               <!-- [MakePreds] -->
-               <div class="col s6">
-                  <button class="waves-effect waves-light btn" id="btn_prediction" onclick="onClickPredict()">Make Prediction</button>
-                  <div class="spinner-border" id="load_predicting" style="display:none"></div>
-               </div>
-            </div>
-            <div class="row" id="div_container_predicting" style="display:none">
-               <div class="col s12">
-                  <div class="card z-depth-2">
-                     <div class="card-content">
-                        <span class="card-title grey-text text-darken-4" id="div_predict_title">Predicted</span>
-                        <div id="div_prediction_graph"></div>
-                     </div>
-                  </div>
-               </div>
-            </div>
-
          </div>
-      </div><!-- div_predict -->
+      </div> <!-- div_next_steps -->
 
    </div> <!-- blog -->
 
-   <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
-   <script src="https://jinglescode.github.io/assets/js/materialize.min.js" type="text/javascript"></script>
-   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
-   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+      <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+      <script src="https://jinglescode.github.io/assets/js/materialize.min.js" type="text/javascript"></script>
+      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.0.0/dist/tf.min.js"></script>
+      <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
-   <script src="./model.js"></script>
-   <script src="./index.js"></script>
+      <script src="./index.js"></script>
 
-   <script>
-      $(document).ready(function () {
-         $('.tooltipped').tooltip();
-         $('.scrollspy').scrollSpy();
-         $('.sidenav').sidenav();
-      });
-   </script>
+      <script>
+         $(document).ready(function () {
+            $('.tooltipped').tooltip();
+            $('.scrollspy').scrollSpy();
+            $('.sidenav').sidenav();
+         });
+      </script>
 
 </body>
 </html>
