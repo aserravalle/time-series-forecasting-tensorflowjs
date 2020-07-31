@@ -1,17 +1,19 @@
 // Machine Learning parameters
 let training_periods = 20;
-let trainingsize = 90;
-let n_epochs = 5;
-let learningrate = 0.01;
-let n_hiddenlayers = 4;
-let add_days = 1;
+let n_epochs = 100;
+let learningrate = 0.07;
+let n_hiddenlayers = 20;
+let prediction_period = 30;
 
 // Data Parameters
 let grouped_data; // array of dictionaries with keys { timestamp, price }
-let X_train; // Last 20 data points
+let timestamps; // Nx1 array of dates
+let prices; // Nx1 array of prices
+let Train;
+let X_train; // Last 20 prices in each row
 let Y_train; // Average
 
-let DEBUG = true; // if true, will skip the whol
+let DEBUG = true; // if true, will skip the button pressing
 
 $(document).ready(function(){
    $('select').formSelect();
@@ -36,7 +38,7 @@ function onClickLoadData() {
       console.log(e)
       $("#btn_train_loading").hide();
       $("#div_trainingdata").html("<span>Error with the uploaded SPR</span>");
-	}
+   }
 }
 
 function CleanRawData(raw_data) {
@@ -110,12 +112,12 @@ function GraphCleanData(data, headers) {
       $("#div_linegraph_data_title").text(title);
 
       if(data.length > 0){
-         let timestamps = data.map(function (val) { return val['timestamp']; });
-         let revenues = data.map(function (val) { return val['price']; });
+         timestamps = data.map(function (val) { return val['timestamp']; });
+         prices = data.map(function (val) { return val['price']; });
 
          let graph_plot = document.getElementById('div_linegraph_data');
          Plotly.newPlot(graph_plot, [{
-            x: timestamps, y: revenues,
+            x: timestamps, y: prices,
             name: "Shipment Revenue",
             xaxis: {title: headers[0]},
             yaxis: {title: headers[1]}
@@ -125,16 +127,12 @@ function GraphCleanData(data, headers) {
    displayTrainingData(data);
 }
 
-//================
-// Train
-//================
-
 function displayTrainingData(data) {
    $("#div_container_trainingdata").show();
 
-   sma_vec = GenerateTrainingData(data, training_periods);
-   /* sma_vec = [{
-         avg: 12.34, 
+   Train = GenerateTrainingData(data, training_periods);
+   /* Train = [{
+         target: 12.34, 
          set: [
                {timestamp: "date1", price: 12.34},
                {timestamp: "date2", price: 12.34},
@@ -142,14 +140,14 @@ function displayTrainingData(data) {
                ] // 20 rows of grouped_data in each row
          }] */
 
-   let set = sma_vec.map(function (val_sma) { return val_sma['set']; });
+   let set = Train.map(function (val) { return val['set']; });
    let data_output = "";
    for (let index = 0; index < 10; index++) {
       data_output += "<tr><td width=\"20px\">" + (index + 1) +
          "</td><td>[" + set[index].map(function (val) {
             return (Math.round(val['price'] * 10000) / 10000).toString();
          }).toString() +
-         "]</td><td>" + sma_vec[index]['avg'] + "</td></tr>";
+         "]</td><td>" + Train[index]['target'] + "</td></tr>";
    }
 
    data_output = "<table class='striped'>" +
@@ -163,21 +161,23 @@ function displayTrainingData(data) {
 
    $("#div_container_train").show();
    $("#div_container_trainfirst").hide();
-}
-function GenerateTrainingData(data, training_periods) {
-   let r_avgs = []
-   let avg_prev = 0;
-   for (let i = 0; i <= data.length - training_periods; i++) {
-      let curr_avg = 0.00, t = i + training_periods;
-      for (let k = i; k < t && k <= data.length; k++) {
-         curr_avg += data[k]['price'] / training_periods;
-      }
-      r_avgs.push({ set: data.slice(i, i + training_periods), avg: curr_avg });
-      avg_prev = curr_avg;
-   }
-   return r_avgs;
+
+	if (DEBUG) {
+      onClickTrainModel();
+	}
 }
 
+function GenerateTrainingData(data, training_periods) {
+   let train = []
+   for (let i = 0; i <= data.length - training_periods - 1; i++) {
+      train.push({ set: data.slice(i, i + training_periods), target: data[i + training_periods] });
+   }
+   return train;
+}
+
+//================
+// Train
+//================
 
 async function onClickTrainModel(){
    let epoch_loss = [];
@@ -187,13 +187,12 @@ async function onClickTrainModel(){
 
    document.getElementById("div_traininglog").innerHTML = "";
 
-   X_train = sma_vec.map(function(val_sma){
-      return val_sma['set'].map(function (val_set) { return val_set['price']; })
+   X_train = Train.map(function (val) {
+      return val['set'].map(function (val_set) { return val_set['price']; })
    });
-   Y_train = grouped_data.map(function (val) { return val['price']; }).slice(training_periods - 1, grouped_data.length);
-
-   let x_train = X_train.slice(0, Math.floor(trainingsize / 100 * X_train.length));
-   let y_train = Y_train.slice(0, Math.floor(trainingsize / 100 * Y_train.length));
+   Y_train = Train.map(function (val) {
+      return val['target']
+   }).map(function (val2) { return val2['price'] });
 
    let trainingLogCallback = function(epoch, log) {
       let logHtml = document.getElementById("div_traininglog").innerHTML;
@@ -212,7 +211,7 @@ async function onClickTrainModel(){
       Plotly.newPlot( graph_plot, [{x: Array.from({length: epoch_loss.length}, (v, k) => k+1), y: epoch_loss, name: "Loss" }], { margin: { t: 0 } } );
    };
 
-   result = await trainModel(x_train, y_train, training_periods, n_epochs, learningrate, n_hiddenlayers, trainingLogCallback);
+   result = await trainModel(X_train, Y_train, training_periods, n_epochs, learningrate, n_hiddenlayers, trainingLogCallback);
 
    let logHtml = document.getElementById("div_traininglog").innerHTML;
    logHtml = "<div>Model training complete</div>" + logHtml;
@@ -222,6 +221,10 @@ async function onClickTrainModel(){
    $("#div_container_validatefirst").hide();
    $("#div_container_predict").show();
    $("#div_container_predictfirst").hide();
+
+   if (DEBUG) {
+      onClickValidate();
+   }
 }
 
 //================
@@ -244,90 +247,80 @@ $("#load_validating").hide();
 }
 
 function ValidateAndGraphModel() {
-   // validate on training
-   let x_train = X_train.slice(0, Math.floor(trainingsize / 100 * X_train.length));
-   let y_pred_train = makePredictions(x_train, result['model']);
-
-   // validate on unseen
-   let x_val = X_train.slice(Math.floor(trainingsize / 100 * X_train.length), X_train.length);
-   let y_pred_val = makePredictions(x_val, result['model']);
+   // validation
+   let x_train = X_train.slice(0, X_train.length - prediction_period);
+   let y_pred = makePredictions(x_train, result['model']);
 
    // Timestamps
-   let timestamps_training = GetTimestamps(0, grouped_data.length - Math.floor((100 - trainingsize) / 100 * grouped_data.length) +1 );
-   let timestamps_pred_train = GetTimestamps(training_periods - 1, grouped_data.length - Math.floor((100 - trainingsize) / 100 * grouped_data.length) - 1);
-   let timestamps_pred_val = GetTimestamps(training_periods - 1 + Math.floor(trainingsize / 100 * X_train.length), X_train.length - 1);
+   let timestamps_train = GetTimestamps(0, grouped_data.length - prediction_period);
+   let timestamps_val = GetTimestamps(grouped_data.length - prediction_period, grouped_data.length);
+   let timestamps_pred = GetTimestamps(training_periods - 1, grouped_data.length);
 
    // prices
-   let prices = grouped_data.map(function (val) { return val['price']; });
+   let prices_train = prices.slice(0, grouped_data.length - prediction_period);
+   let prices_val = prices.slice(grouped_data.length - prediction_period, grouped_data.length);
 
    // Plotly
    let graph_plot = document.getElementById('div_validation_graph');
    Plotly.newPlot(graph_plot, [{
-      x: timestamps_training, y: prices, name: "Shipment Revenue", mode: 'lines', line: { color: 'rgb(55, 128, 191)', width: 3}
+      x: timestamps_train, y: prices_train, name: "Shipment Revenue", mode: 'lines', line: { color: 'rgb(55, 128, 191)', width: 3}
    }], { margin: { t: 0 } });
    Plotly.plot(graph_plot, [{
-      x: timestamps_pred_val, y: prices, name: "Shipment Revenue (unseen)", mode: 'lines', line: { color: 'rgb(55, 128, 191)', dash: 'dash', width: 3 }
+      x: timestamps_val, y: prices_val, name: "Shipment Revenue (unseen)", mode: 'lines', line: { color: 'rgb(55, 128, 191)', dash: 'dash', width: 3 }
    }], { margin: { t: 0 } });
    Plotly.plot(graph_plot, [{
-      x: timestamps_pred_train, y: y_pred_train, name: "Predicted (train)", mode: 'lines', line: { color: 'rgb(165,0,38)', width: 1 }
-   }], { margin: { t: 0 } });
-   Plotly.plot(graph_plot, [{
-      x: timestamps_pred_val, y: y_pred_val, name: "Predicted (test)", mode: 'lines', line: { color: 'rgb(254,224,144)', width: 1 }
+      x: timestamps_pred, y: y_pred, name: "Predicted", mode: 'lines', line: { color: 'rgb(165,0,38)', width: 1 }
    }], { margin: { t: 0 } });
 }
 
 function GetTimestamps(a, b) {
    return grouped_data.map(function (val) {
       return val['timestamp'];
-   }).splice(a, b);
+   }).slice(a, b);
 }
 
 //================
 // Modelling
 //================
 
-async function trainModel(X, Y, window_size, n_epochs, learning_rate, n_layers, callback) {
-
-   const input_layer_shape = window_size;
+async function trainModel(X, Y, training_periods, n_epochs, learning_rate, n_layers, callback) {
+   // Define model parameters
+   const input_layer_shape = training_periods;
    const input_layer_neurons = 100;
-
    const rnn_input_layer_features = 10;
    const rnn_input_layer_timesteps = input_layer_neurons / rnn_input_layer_features;
-
    const rnn_input_shape = [rnn_input_layer_features, rnn_input_layer_timesteps];
    const rnn_output_neurons = 20;
-
-   const rnn_batch_size = window_size;
-
+   const rnn_batch_size = training_periods;
    const output_layer_shape = rnn_output_neurons;
    const output_layer_neurons = 1;
 
+   // Define data size
+   const xs = tf.tensor2d(X, [X.length, X[0].length]);
+   const ys = tf.tensor2d(Y, [Y.length, 1]).reshape([Y.length, 1]);
+
+   // Build model layers
    const model = tf.sequential();
-
-   const xs = tf.tensor2d(X, [X.length, X[0].length]).div(tf.scalar(10));
-   const ys = tf.tensor2d(Y, [Y.length, 1]).reshape([Y.length, 1]).div(tf.scalar(10));
-
    model.add(tf.layers.dense({ units: input_layer_neurons, inputShape: [input_layer_shape] }));
    model.add(tf.layers.reshape({ targetShape: rnn_input_shape }));
-
    let lstm_cells = [];
    for (let index = 0; index < n_layers; index++) {
       lstm_cells.push(tf.layers.lstmCell({ units: rnn_output_neurons }));
    }
-
    model.add(tf.layers.rnn({
       cell: lstm_cells,
       inputShape: rnn_input_shape,
       returnSequences: false
    }));
-
    model.add(tf.layers.dense({ units: output_layer_neurons, inputShape: [output_layer_shape] }));
 
+   // compile model
    model.compile({
       optimizer: tf.train.adam(learning_rate),
       loss: 'meanSquaredError'
    });
 
+   // graph the error reduction
    const hist = await model.fit(xs, ys,
       {
          batchSize: rnn_batch_size, epochs: n_epochs, callbacks: {
@@ -341,14 +334,24 @@ async function trainModel(X, Y, window_size, n_epochs, learning_rate, n_layers, 
 }
 
 function makePredictions(X, model) {
-   let predictedResults = model.predict(tf.tensor2d(X, [X.length, X[0].length]).div(tf.scalar(10))).mul(10);
-   let result = Array.from(predictedResults.dataSync());
+   y_preds = []
+   N = X.length;
+   for (var i = 0; i < N; i++) {
+      let y_pred = model.predict(tf.tensor2d(X[i], [1, X[0].length]));
+      y_pred = Array.from(y_pred.dataSync())[0];
+      y_preds.push(y_pred);
+   }
 
-   let sum = result.reduce((a, b) => a + b, 0);
-   let avg = (sum / result.length) || 0;
-   console.log(avg);
-   let scale = 100000 / avg;
+   for (var i = N; i < N + prediction_period; i++) { // we wish to predict (prediction_period) days in the future
+      let new_Xi = X[X.length-1]; // Take the last observation
 
-   return result.map(function (x) { return x * scale; });
+      new_Xi.shift(); // remove the oldest value (index = 0) in the last X array
+      new_Xi.push(y_preds[y_preds.length-1]); // Add the last prediction to that array in the newest position (index = length)
+
+      let y_pred = model.predict(tf.tensor2d(new_Xi, [1, X[0].length]));
+      y_pred = Array.from(y_pred.dataSync())[0];
+      y_preds.push(y_pred); // Make a prediction on the fake array
+   }
+
+   return y_preds;
 }
-
